@@ -1,28 +1,18 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { classifyTrack } from './classifier/index.js';
-import type { CachedClassification, Mood, TrackClassification } from './types.js';
-
-const classificationCache: CachedClassification[] = [];
-
-function cacheClassification(artist: string, title: string, classification: TrackClassification): void {
-  const existing = classificationCache.find(
-    c => c.artist.toLowerCase() === artist.toLowerCase() && c.title.toLowerCase() === title.toLowerCase()
-  );
-  if (!existing) {
-    classificationCache.push({ artist, title, classification });
-  }
-}
+import type { Mood, TrackClassification } from './types.js';
+import { searchByMood } from './db/cache.js';
 
 export function createServer(): McpServer {
   const server = new McpServer({
     name: 'crate-digger',
-    version: '1.0.0',
+    version: '2.0.0',
   });
 
   server.tool(
     'classify_track',
-    'Classify a single track by mood, energy, and subgenre vibe using lyrics + spectral analysis',
+    'Classify a single track by mood, energy, and subgenre vibe using lyrics + spectral analysis + Spotify',
     {
       artist: z.string().describe('Artist name'),
       title: z.string().describe('Track title'),
@@ -30,7 +20,6 @@ export function createServer(): McpServer {
     },
     async ({ artist, title, audio_path }) => {
       const classification = await classifyTrack(artist, title, audio_path);
-      cacheClassification(artist, title, classification);
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(classification, null, 2) }],
       };
@@ -51,7 +40,6 @@ export function createServer(): McpServer {
       const results: TrackClassification[] = [];
       for (const track of tracks) {
         const classification = await classifyTrack(track.artist, track.title, track.audio_path);
-        cacheClassification(track.artist, track.title, classification);
         results.push(classification);
       }
       return {
@@ -73,7 +61,6 @@ export function createServer(): McpServer {
       const classifications: TrackClassification[] = [];
       for (const track of tracks) {
         const classification = await classifyTrack(track.artist, track.title);
-        cacheClassification(track.artist, track.title, classification);
         classifications.push(classification);
       }
 
@@ -89,7 +76,6 @@ export function createServer(): McpServer {
         }
       }
 
-      // Find dominant mood
       let dominantMood = 'chill';
       let maxCount = 0;
       for (const [mood, count] of Object.entries(moodCounts)) {
@@ -99,14 +85,12 @@ export function createServer(): McpServer {
         }
       }
 
-      // Build distribution as percentages
       const total = classifications.length;
       const moodDistribution: Record<string, number> = {};
       for (const [mood, count] of Object.entries(moodCounts)) {
         moodDistribution[mood] = Math.round((count / total) * 100);
       }
 
-      // Unique vibes for summary
       const uniqueVibes = [...new Set(vibes)];
       const vibeSummary = uniqueVibes.length > 0
         ? uniqueVibes.slice(0, 5).join(', ')
@@ -134,13 +118,7 @@ export function createServer(): McpServer {
       energy_max: z.number().min(0).max(100).optional().describe('Maximum energy level (0-100)'),
     },
     async ({ mood, energy_min, energy_max }) => {
-      const results = classificationCache.filter(c => {
-        if (c.classification.mood !== mood as Mood) return false;
-        if (energy_min !== undefined && c.classification.energy < energy_min) return false;
-        if (energy_max !== undefined && c.classification.energy > energy_max) return false;
-        return true;
-      });
-
+      const results = searchByMood(mood as Mood, energy_min, energy_max);
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(results, null, 2) }],
       };

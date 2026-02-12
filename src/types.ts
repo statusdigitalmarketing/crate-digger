@@ -7,6 +7,7 @@ export interface TrackClassification {
   lyric_themes: string[];
   spectral_mood: string;
   confidence: number; // 0-1
+  mood_arc?: MoodArc;
   source: {
     lyrics_found: boolean;
     lyrics_source: 'genius' | 'musixmatch' | 'llm' | 'none';
@@ -30,6 +31,20 @@ export interface SpectralFeatures {
   mfcc: number[];
 }
 
+export interface SpotifyFeatures {
+  valence: number; // 0-1, happiness
+  danceability: number;
+  energy: number;
+  tempo: number;
+  acousticness: number;
+  instrumentalness: number;
+  speechiness: number;
+  liveness: number;
+  loudness: number;
+  key: number;
+  mode: number; // 0=minor, 1=major
+}
+
 export interface LyricsAnalysis {
   themes: string[];
   sentiment: number; // -1 to 1
@@ -48,4 +63,10 @@ export interface CachedClassification {
   artist: string;
   title: string;
   classification: TrackClassification;
+}
+
+export interface MoodArc {
+  sections: Array<{ label: string; sentiment: number; mood: Mood }>;
+  arc_type: 'steady' | 'build' | 'drop' | 'contrast' | 'climax';
+  variance: number; // 0 = monotone, 1 = wild swings
 }
