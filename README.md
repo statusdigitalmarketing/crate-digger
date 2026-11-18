@@ -12,10 +12,10 @@ For each track it returns:
 
 It works from two inputs:
 
-1. **Lyrics**, fetched with your own Genius and/or Musixmatch API key, scored against a built-in sentiment word list.
+1. **Lyrics**, looked up for free on [LRCLIB](https://lrclib.net) (no account or API key needed) and scored against a built-in sentiment word list.
 2. **Audio**, if you give it the path to a **WAV** file on your computer. It measures loudness, brightness and texture of the sound and maps that to a mood. Only WAV is supported (convert MP3s first).
 
-With neither lyrics nor audio, it can only make a low-confidence neutral guess, so add at least one key or pass a WAV file.
+If a song is not on LRCLIB and you pass no audio, it can only make a low-confidence neutral guess.
 
 Everything runs on your own computer. Results are cached in `~/.crate-digger/crate-digger.db` so repeat lookups are instant and `search_by_mood` can find tracks you have already classified.
 
@@ -31,12 +31,14 @@ Everything runs on your own computer. Results are cached in `~/.crate-digger/cra
 ## Requirements
 
 - **Node.js 22.13 or newer** (it uses Node's built-in SQLite). Check with `node -v`. Get it from https://nodejs.org (the LTS download is fine).
-- Your own API keys (free), see below. Never share yours, and nobody ships theirs with this download.
+- That's it. No API keys are needed. Internet access is used to look up lyrics.
 
-## Get your API keys
+## Optional extra lyrics sources
 
-- **Musixmatch** (recommended, the most reliable lyrics source): sign up at https://developer.musixmatch.com and copy the API key from your dashboard. The free plan returns about 30% of each song's lyrics, which is enough for the mood scoring, and is for non-commercial use.
-- **Genius** (optional): go to https://genius.com/api-clients, create an API client (any name, any website URL), then click "Generate Access Token" and copy it. Note: Genius often blocks automated requests to its lyrics pages, so Genius lookups can come back empty. Crate Digger then falls through to Musixmatch.
+LRCLIB covers most songs. If a track is missing there, Crate Digger also tries these, but only when you add their keys (never share yours; none ship with this download):
+
+- **Musixmatch**: `MUSIXMATCH_API_KEY`. Musixmatch no longer offers a free developer key; its API plans are paid (https://www.musixmatch.com/pro/api/pricing).
+- **Genius**: `GENIUS_API_KEY`. Create an API client at https://genius.com/api-clients and click "Generate Access Token". Genius usually blocks automated requests to its lyrics pages, so expect this to find little.
 - **Spotify** (optional, most people can skip it): `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` add Spotify's audio features, but Spotify closed that endpoint to new apps in late 2024, so a new Spotify app will not get any data from it.
 
 ## Install
@@ -48,34 +50,27 @@ Everything runs on your own computer. Results are cached in `~/.crate-digger/cra
 
 ### Claude Desktop
 
-Open Claude Desktop, go to Settings, Developer, Edit Config. That opens `claude_desktop_config.json`. Add this (merge it into `mcpServers` if you already have one), using your real paths and keys:
+Open Claude Desktop, go to Settings, Developer, Edit Config. That opens `claude_desktop_config.json`. Add this (merge it into `mcpServers` if you already have one), using your real paths:
 
 ```json
 {
   "mcpServers": {
     "crate-digger": {
       "command": "/opt/homebrew/bin/node",
-      "args": ["/Users/you/crate-digger/crate-digger.mjs"],
-      "env": {
-        "MUSIXMATCH_API_KEY": "your-musixmatch-key",
-        "GENIUS_API_KEY": "your-genius-token"
-      }
+      "args": ["/Users/you/crate-digger/crate-digger.mjs"]
     }
   }
 }
 ```
 
-Quit and reopen Claude Desktop. Crate Digger shows up under the tools icon in a new chat.
+If you have optional keys, add an `"env": { "GENIUS_API_KEY": "..." }` block next to `args`. Quit and reopen Claude Desktop. Crate Digger shows up under the tools icon in a new chat.
 
 Use the full path to `node` rather than just `node`: Claude Desktop does not always see the same PATH as your terminal.
 
 ### Claude Code
 
 ```bash
-claude mcp add crate-digger \
-  -e MUSIXMATCH_API_KEY=your-musixmatch-key \
-  -e GENIUS_API_KEY=your-genius-token \
-  -- node /Users/you/crate-digger/crate-digger.mjs
+claude mcp add crate-digger -- node /Users/you/crate-digger/crate-digger.mjs
 ```
 
 Then start `claude` and run `/mcp` to check it is connected.

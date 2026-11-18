@@ -67,7 +67,8 @@ export async function classifyTrack(
     classification.mood_arc = analyzeTemporalMood(lyricsResult.lyrics);
   }
 
-  // Persist to DB
+  // Persist to DB, unless lyrics are missing only because a source was down (retry next time instead)
+  if (lyricsResult.transient) return classification;
   try {
     upsertClassification(artist, title, classification, spotifyFeatures);
   } catch {

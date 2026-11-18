@@ -1,6 +1,6 @@
 {
   "name": "crate-digger",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "MCP server that classifies music tracks by mood, energy, and subgenre vibe using lyrics analysis + spectral audio features + Spotify",
   "type": "module",
   "main": "dist/index.js",
