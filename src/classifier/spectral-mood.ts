@@ -1,8 +1,7 @@
-import { createRequire } from 'module';
 import { readFileSync } from 'fs';
+import MeydaModule from 'meyda';
+import nodeWav from 'node-wav';
 import type { SpectralFeatures } from '../types.js';
-
-const require = createRequire(import.meta.url);
 
 interface MeydaInstance {
   bufferSize: number;
@@ -15,7 +14,8 @@ interface MeydaInstance {
   ): Record<string, unknown> | null;
 }
 
-const Meyda: MeydaInstance = require('meyda');
+// Static imports (not createRequire) so the single-file release bundle includes them.
+const Meyda = MeydaModule as unknown as MeydaInstance;
 
 interface WavData {
   sampleRate: number;
@@ -23,9 +23,8 @@ interface WavData {
 }
 
 function decodeWav(filePath: string): WavData {
-  const wavModule = require('node-wav') as { decode: (buffer: Buffer) => WavData };
   const buffer = readFileSync(filePath);
-  return wavModule.decode(buffer);
+  return nodeWav.decode(buffer);
 }
 
 function mixToMono(channelData: Float32Array[]): Float32Array {

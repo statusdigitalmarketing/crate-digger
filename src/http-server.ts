@@ -184,7 +184,7 @@ export function startHttpServer(port: number): void {
     }
   });
 
-  server.listen(port, () => {
-    process.stderr.write(`Crate Digger HTTP server listening on port ${port}\n`);
+  server.listen(port, '127.0.0.1', () => {
+    process.stderr.write(`Crate Digger HTTP server listening on http://127.0.0.1:${port}\n`);
   });
 }

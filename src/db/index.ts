@@ -36,9 +36,20 @@ export function getDb(): BetterSqlite3Database {
   if (db) return db;
 
   try {
-    const Database = require('better-sqlite3') as new (path: string) => BetterSqlite3Database;
-    db = new Database(getDbPath());
-    initSchema(db);
+    // node:sqlite is built into Node 22.13+ / 23.4+, so the download has no native
+    // module to compile (better-sqlite3 had no prebuilt binary for newer Node).
+    const { DatabaseSync } = require('node:sqlite') as { DatabaseSync: new (path: string) => BetterSqlite3Database };
+    const conn = new DatabaseSync(getDbPath());
+    try {
+      // Wait up to 5s for another process's write lock instead of failing at once.
+      conn.exec('PRAGMA busy_timeout = 5000');
+      initSchema(conn);
+    } catch (initErr: unknown) {
+      // Do not cache a connection whose schema setup failed: the next call retries.
+      conn.close();
+      throw initErr;
+    }
+    db = conn;
     return db;
   } catch (err: unknown) {
     process.stderr.write(`SQLite init error: ${err instanceof Error ? err.message : String(err)}\n`);
@@ -82,6 +93,12 @@ function initSchema(database: BetterSqlite3Database): void {
       UNIQUE(artist, title)
     );
   `);
+
+  // Added after v2.0.0: databases created earlier lack this column.
+  const columns = database.prepare('PRAGMA table_info(classifications)').all();
+  if (!columns.some(c => c['name'] === 'mood_arc')) {
+    database.exec('ALTER TABLE classifications ADD COLUMN mood_arc TEXT');
+  }
 }
 
 export function closeDb(): void {
