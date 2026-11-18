@@ -97,7 +97,7 @@ describe('lrclib', () => {
     expect(urls.length).toBe(1);
   });
 
-  it('matches whole artist names, including collaborations', () => {
+  it('matches the lead artist, not fragments of a band name', () => {
     expect(artistMatches('Daft Punk', 'daft punk')).toBe(true);
     expect(artistMatches('Daft Punk', 'Daft Punk feat. Romanthony')).toBe(true);
     expect(artistMatches('Beyoncé', 'Beyonce')).toBe(true);
@@ -107,7 +107,12 @@ describe('lrclib', () => {
     expect(artistMatches('Daft Punk', undefined)).toBe(false);
     expect(artistMatches('Dio', 'Radiohead')).toBe(false);
     expect(artistMatches('Air', 'Air Supply')).toBe(false);
-    expect(artistMatches('Kanye West', 'JAY-Z & Kanye West')).toBe(true);
+    expect(artistMatches('Earth, Wind & Fire', 'Earth')).toBe(false);
+    expect(artistMatches('Earth', 'Earth, Wind & Fire')).toBe(false);
+    expect(artistMatches('Earth, Wind & Fire', 'Earth, Wind & Fire')).toBe(true);
+    expect(artistMatches('Simon & Garfunkel', 'simon and garfunkel')).toBe(true);
+    expect(artistMatches('Simon', 'Simon & Garfunkel')).toBe(false);
+    expect(artistMatches('Daft Punk (feat. Romanthony)', 'Daft Punk')).toBe(true);
     expect(artistMatches('Florence and the Machine', 'Florence and the Machine')).toBe(true);
   });
 
@@ -116,6 +121,10 @@ describe('lrclib', () => {
     expect(titleMatches('Here Comes the Sun', 'Here Comes the Sun (Remastered 2019)')).toBe(true);
     expect(titleMatches('Song', 'Song - Radio Edit')).toBe(true);
     expect(titleMatches('Love', 'Love song')).toBe(false);
+    expect(titleMatches('(sic)', '(sic)')).toBe(true);
+    expect(titleMatches('(Nice Dream)', '(nice dream)')).toBe(true);
+    expect(titleMatches("(Don't Fear) The Reaper", "(Don't Fear) The Reaper (Remastered)")).toBe(true);
+    expect(titleMatches("(Don't Fear) The Reaper", 'The Reaper')).toBe(false);
     expect(titleMatches('Love', undefined)).toBe(false);
   });
 

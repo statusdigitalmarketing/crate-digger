@@ -31,38 +31,46 @@ function normalize(value: string): string {
     .trim();
 }
 
-// "Daft Punk feat. Romanthony", "Jay-Z & Kanye West", "Skrillex x Diplo", "A, B and C"
-const COLLAB_SPLIT = /\s*(?:,|&|\+|\/|\bfeat\.?|\bft\.?|\bfeaturing\b|\bwith\b|\band\b|\bx\b|\bvs\.?)\s*/i;
+// Only explicit featuring credits are split off. "&", "," and "and" stay, because they are part of real
+// band names ("Earth, Wind & Fire", "Simon & Garfunkel"), and splitting them causes wrong-artist matches.
+const FEATURING = /\s*(?:\(|\[)?\s*\b(?:feat\.?|ft\.?|featuring)\s.*$/i;
 
-function artistNames(value: string): string[] {
-  return value.split(COLLAB_SPLIT).map(normalize).filter(Boolean);
+function primaryArtist(value: string): string {
+  // "&" and "and" are the same word in a band name (Simon & Garfunkel = Simon and Garfunkel).
+  return normalize(value.replace(FEATURING, '').replace(/&/g, ' and '));
 }
 
 /**
- * True when the two artist credits share a whole artist name. Collaborations are split first,
- * so "Daft Punk" matches "Daft Punk feat. Romanthony", but "Dio" never matches "Radiohead"
- * and "Air" never matches "Air Supply".
+ * True when both credits name the same lead artist: "Daft Punk" matches "Daft Punk feat. Romanthony",
+ * but "Dio" never matches "Radiohead", "Air" never matches "Air Supply", and "Earth" never
+ * matches "Earth, Wind & Fire". A miss only means no lyrics; a false match means the wrong song.
  */
 export function artistMatches(wanted: string, found: string | undefined): boolean {
   if (!found) return false;
-  const wantedNames = artistNames(wanted);
-  const foundNames = new Set(artistNames(found));
-  // A band name containing "and" ("Florence and the Machine") is also compared whole.
-  const wholeWanted = normalize(wanted);
-  if (wholeWanted && wholeWanted === normalize(found)) return true;
-  return wantedNames.some(name => foundNames.has(name));
+  const a = primaryArtist(wanted);
+  return a !== '' && a === primaryArtist(found);
 }
 
-/** Title without version suffixes: "Song (Remastered 2011)", "Song - Radio Edit", "Song [Live]". */
-function baseTitle(value: string): string {
-  return normalize(value.replace(/\s*[([].*?[)\]]/g, '').replace(/\s+-\s+.*$/, ''));
+// Trailing version tags only: "Song (Remastered 2011)", "Song [Live]", "Song - Radio Edit".
+const TRAILING_GROUP = /\s*[([][^()[\]]*[)\]]\s*$/;
+const DASH_SUFFIX = /\s+-\s+[^-]*$/;
+
+function stripVersion(value: string): string {
+  let out = value.trim();
+  for (let prev = ''; prev !== out;) {
+    prev = out;
+    out = out.replace(TRAILING_GROUP, '').replace(DASH_SUFFIX, '').trim();
+  }
+  return normalize(out);
 }
 
-/** True when the record is the requested song, ignoring case, punctuation and version suffixes. */
+/** True when the record is the requested song: same title, or same title once trailing version tags are removed. */
 export function titleMatches(wanted: string, found: string | undefined): boolean {
   if (!found) return false;
-  const a = baseTitle(wanted);
-  return a !== '' && a === baseTitle(found);
+  const a = normalize(wanted);
+  if (a !== '' && a === normalize(found)) return true;
+  const baseA = stripVersion(wanted);
+  return baseA !== '' && baseA === stripVersion(found);
 }
 
 /** Returns usable lyrics from one LRCLIB record, or null for instrumentals and empty records. */
