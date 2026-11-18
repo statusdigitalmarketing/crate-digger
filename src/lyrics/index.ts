@@ -1,6 +1,6 @@
 import type { LyricsResult } from '../types.js';
 import { LyricsCache } from './cache.js';
-import { fetchFromLrclib } from './lrclib.js';
+import { fetchFromLrclib, LrclibUnavailableError } from './lrclib.js';
 import { fetchFromGenius } from './genius.js';
 import { fetchFromMusixmatch } from './musixmatch.js';
 import { llmFallback } from './llm-fallback.js';
@@ -13,10 +13,17 @@ export async function fetchLyrics(artist: string, title: string): Promise<Lyrics
   if (cached) return cached;
 
   // Try LRCLIB first: free, no key, full lyrics
-  const lrclibResult = await fetchFromLrclib(artist, title);
-  if (lrclibResult) {
-    cache.set(artist, title, lrclibResult);
-    return lrclibResult;
+  let lrclibUnavailable = false;
+  try {
+    const lrclibResult = await fetchFromLrclib(artist, title);
+    if (lrclibResult) {
+      cache.set(artist, title, lrclibResult);
+      return lrclibResult;
+    }
+  } catch (err: unknown) {
+    if (!(err instanceof LrclibUnavailableError)) throw err;
+    process.stderr.write(`${err.message}\n`);
+    lrclibUnavailable = true;
   }
 
   // Try Genius
@@ -35,6 +42,10 @@ export async function fetchLyrics(artist: string, title: string): Promise<Lyrics
 
   // LLM fallback
   const fallbackResult = llmFallback(artist, title);
+  if (lrclibUnavailable) {
+    // An outage is not "this song has no lyrics": do not cache it, so the next request retries.
+    return { ...fallbackResult, transient: true };
+  }
   cache.set(artist, title, fallbackResult);
   return fallbackResult;
 }

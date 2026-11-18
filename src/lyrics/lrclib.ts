@@ -13,6 +13,14 @@ export interface LrclibRecord {
   plainLyrics?: string | null;
 }
 
+/** Thrown when LRCLIB could not answer (outage, rate limit, timeout, network), as opposed to "song not found". */
+export class LrclibUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'LrclibUnavailableError';
+  }
+}
+
 function normalize(value: string): string {
   // Strip accents (Beyoncé = Beyonce) but keep letters from any script (Japanese, Arabic, ...).
   return value
@@ -23,13 +31,38 @@ function normalize(value: string): string {
     .trim();
 }
 
-/** Loose artist match so a search hit by a different artist is not used ("Daft Punk" vs "Daft Punk feat. X" is fine). */
+// "Daft Punk feat. Romanthony", "Jay-Z & Kanye West", "Skrillex x Diplo", "A, B and C"
+const COLLAB_SPLIT = /\s*(?:,|&|\+|\/|\bfeat\.?|\bft\.?|\bfeaturing\b|\bwith\b|\band\b|\bx\b|\bvs\.?)\s*/i;
+
+function artistNames(value: string): string[] {
+  return value.split(COLLAB_SPLIT).map(normalize).filter(Boolean);
+}
+
+/**
+ * True when the two artist credits share a whole artist name. Collaborations are split first,
+ * so "Daft Punk" matches "Daft Punk feat. Romanthony", but "Dio" never matches "Radiohead"
+ * and "Air" never matches "Air Supply".
+ */
 export function artistMatches(wanted: string, found: string | undefined): boolean {
   if (!found) return false;
-  const a = normalize(wanted);
-  const b = normalize(found);
-  if (!a || !b) return false;
-  return a.includes(b) || b.includes(a);
+  const wantedNames = artistNames(wanted);
+  const foundNames = new Set(artistNames(found));
+  // A band name containing "and" ("Florence and the Machine") is also compared whole.
+  const wholeWanted = normalize(wanted);
+  if (wholeWanted && wholeWanted === normalize(found)) return true;
+  return wantedNames.some(name => foundNames.has(name));
+}
+
+/** Title without version suffixes: "Song (Remastered 2011)", "Song - Radio Edit", "Song [Live]". */
+function baseTitle(value: string): string {
+  return normalize(value.replace(/\s*[([].*?[)\]]/g, '').replace(/\s+-\s+.*$/, ''));
+}
+
+/** True when the record is the requested song, ignoring case, punctuation and version suffixes. */
+export function titleMatches(wanted: string, found: string | undefined): boolean {
+  if (!found) return false;
+  const a = baseTitle(wanted);
+  return a !== '' && a === baseTitle(found);
 }
 
 /** Returns usable lyrics from one LRCLIB record, or null for instrumentals and empty records. */
@@ -39,6 +72,7 @@ export function lyricsFromRecord(record: LrclibRecord | null | undefined): strin
   return lyrics ? lyrics : null;
 }
 
+/** null means "not found" (404); anything LRCLIB could not answer throws LrclibUnavailableError. */
 async function getJson(url: string): Promise<unknown | null> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -48,43 +82,45 @@ async function getJson(url: string): Promise<unknown | null> {
       signal: controller.signal,
     });
     if (response.status === 404) return null;
-    if (!response.ok) {
-      process.stderr.write(`LRCLIB request failed: ${response.status}\n`);
-      return null;
-    }
+    if (!response.ok) throw new LrclibUnavailableError(`LRCLIB request failed: ${response.status}`);
     return await response.json();
+  } catch (err: unknown) {
+    if (err instanceof LrclibUnavailableError) throw err;
+    const reason = err instanceof Error && err.name === 'AbortError'
+      ? 'timed out'
+      : err instanceof Error ? err.message : String(err);
+    throw new LrclibUnavailableError(`LRCLIB request ${reason}`);
   } finally {
     clearTimeout(timeout);
   }
 }
 
+function pick(record: LrclibRecord | null | undefined, artist: string, title: string): string | null {
+  if (!record) return null;
+  if (!artistMatches(artist, record.artistName) || !titleMatches(title, record.trackName)) return null;
+  return lyricsFromRecord(record);
+}
+
+/**
+ * Lyrics for the song, or null when LRCLIB has no lyrics for it.
+ * Throws LrclibUnavailableError when LRCLIB could not be asked, so callers do not cache an outage as "no lyrics".
+ */
 export async function fetchFromLrclib(artist: string, title: string): Promise<LyricsResult | null> {
-  try {
-    const params = new URLSearchParams({ artist_name: artist, track_name: title });
+  const params = new URLSearchParams({ artist_name: artist, track_name: title });
 
-    // 1. Exact lookup.
-    const exact = (await getJson(`${BASE_URL}/get?${params}`)) as LrclibRecord | null;
-    let lyrics = lyricsFromRecord(exact);
+  // 1. Exact lookup.
+  let lyrics = pick((await getJson(`${BASE_URL}/get?${params}`)) as LrclibRecord | null, artist, title);
 
-    // 2. Fuzzy search, keeping only hits by the same artist.
-    if (!lyrics) {
-      const hits = await getJson(`${BASE_URL}/search?${params}`);
-      if (Array.isArray(hits)) {
-        for (const hit of hits as LrclibRecord[]) {
-          if (!artistMatches(artist, hit.artistName)) continue;
-          lyrics = lyricsFromRecord(hit);
-          if (lyrics) break;
-        }
+  // 2. Search, keeping only hits that are the same song by the same artist.
+  if (!lyrics) {
+    const hits = await getJson(`${BASE_URL}/search?${params}`);
+    if (Array.isArray(hits)) {
+      for (const hit of hits as LrclibRecord[]) {
+        lyrics = pick(hit, artist, title);
+        if (lyrics) break;
       }
     }
-
-    if (!lyrics) return null;
-    return { lyrics, source: 'lrclib', themes: [], mood_hint: null };
-  } catch (err: unknown) {
-    const message = err instanceof Error && err.name === 'AbortError'
-      ? 'LRCLIB request timed out'
-      : `LRCLIB error: ${err instanceof Error ? err.message : String(err)}`;
-    process.stderr.write(`${message}\n`);
-    return null;
   }
+
+  return lyrics ? { lyrics, source: 'lrclib', themes: [], mood_hint: null } : null;
 }

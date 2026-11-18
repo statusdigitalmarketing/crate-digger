@@ -22,6 +22,8 @@ export interface LyricsResult {
   source: LyricsSource;
   themes: string[];
   mood_hint: string | null;
+  /** True when no lyrics were found only because a source was unreachable; such results must not be cached. */
+  transient?: boolean;
 }
 
 export interface SpectralFeatures {
