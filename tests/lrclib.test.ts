@@ -125,7 +125,20 @@ describe('lrclib', () => {
     expect(titleMatches('(Nice Dream)', '(nice dream)')).toBe(true);
     expect(titleMatches("(Don't Fear) The Reaper", "(Don't Fear) The Reaper (Remastered)")).toBe(true);
     expect(titleMatches("(Don't Fear) The Reaper", 'The Reaper')).toBe(false);
+    expect(titleMatches('Another Brick in the Wall (Part 1)', 'Another Brick in the Wall (Part 2)')).toBe(false);
+    expect(titleMatches('Song - Part 2', 'Song - Part 1')).toBe(false);
+    expect(titleMatches('Self-Esteem', 'Self Esteem')).toBe(true);
+    expect(titleMatches('One More Time', 'One More Time (feat. Romanthony) [Radio Edit]')).toBe(true);
+    expect(titleMatches('()', '()')).toBe(false);
     expect(titleMatches('Love', undefined)).toBe(false);
+  });
+
+  it('stays fast on huge or pathological names', () => {
+    const t0 = Date.now();
+    expect(artistMatches('A' + ' '.repeat(100000) + 'Z', 'A Z')).toBe(false);
+    expect(titleMatches('x' + ' ('.repeat(50000), 'x')).toBe(true);
+    expect(titleMatches('(' .repeat(50000) + ')', 'x')).toBe(false);
+    expect(Date.now() - t0).toBeLessThan(200);
   });
 
   it('ignores empty and instrumental records', () => {

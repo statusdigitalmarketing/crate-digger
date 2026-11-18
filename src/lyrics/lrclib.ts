@@ -31,13 +31,24 @@ function normalize(value: string): string {
     .trim();
 }
 
+// Matching work is bounded: inputs come from MCP tool arguments and LRCLIB responses of any length.
+const MAX_NAME_LENGTH = 200;
+
+/** Lowercased word tokens. The only regexes used are single-class and linear, so no backtracking blowup. */
+function tokens(value: string): string[] {
+  const n = normalize(value.slice(0, MAX_NAME_LENGTH));
+  return n ? n.split(' ') : [];
+}
+
 // Only explicit featuring credits are split off. "&", "," and "and" stay, because they are part of real
 // band names ("Earth, Wind & Fire", "Simon & Garfunkel"), and splitting them causes wrong-artist matches.
-const FEATURING = /\s*(?:\(|\[)?\s*\b(?:feat\.?|ft\.?|featuring)\s.*$/i;
+const FEATURING_WORDS = new Set(['feat', 'ft', 'featuring']);
 
 function primaryArtist(value: string): string {
   // "&" and "and" are the same word in a band name (Simon & Garfunkel = Simon and Garfunkel).
-  return normalize(value.replace(FEATURING, '').replace(/&/g, ' and '));
+  const words = tokens(value.slice(0, MAX_NAME_LENGTH).replace(/&/g, ' and '));
+  const cut = words.findIndex(w => FEATURING_WORDS.has(w));
+  return (cut === -1 ? words : words.slice(0, cut)).join(' ');
 }
 
 /**
@@ -51,24 +62,44 @@ export function artistMatches(wanted: string, found: string | undefined): boolea
   return a !== '' && a === primaryArtist(found);
 }
 
-// Trailing version tags only: "Song (Remastered 2011)", "Song [Live]", "Song - Radio Edit".
-const TRAILING_GROUP = /\s*[([][^()[\]]*[)\]]\s*$/;
-const DASH_SUFFIX = /\s+-\s+[^-]*$/;
+// A trailing "(...)", "[...]" or " - ..." is dropped only when it is a version tag, so
+// "(Part 1)" and "- Part 2" stay part of the song's identity.
+const VERSION_WORDS = new Set([
+  'remaster', 'remastered', 'live', 'edit', 'version', 'mix', 'remix', 'explicit', 'clean', 'mono',
+  'stereo', 'demo', 'single', 'deluxe', 'bonus', 'extended', 'acoustic', 'unplugged', 'radio',
+  'feat', 'ft', 'featuring',
+]);
+
+function isVersionTag(text: string): boolean {
+  return tokens(text).some(w => VERSION_WORDS.has(w));
+}
 
 function stripVersion(value: string): string {
-  let out = value.trim();
-  for (let prev = ''; prev !== out;) {
-    prev = out;
-    out = out.replace(TRAILING_GROUP, '').replace(DASH_SUFFIX, '').trim();
+  let out = value.slice(0, MAX_NAME_LENGTH).trim();
+  // Each pass removes one tag or stops, and the string only shrinks, so this ends quickly.
+  for (;;) {
+    const last = out.charAt(out.length - 1);
+    if (last === ')' || last === ']') {
+      const open = out.lastIndexOf(last === ')' ? '(' : '[');
+      if (open > 0 && isVersionTag(out.slice(open + 1, -1))) {
+        out = out.slice(0, open).trim();
+        continue;
+      }
+    }
+    const dash = out.lastIndexOf(' - ');
+    if (dash > 0 && isVersionTag(out.slice(dash + 3))) {
+      out = out.slice(0, dash).trim();
+      continue;
+    }
+    return tokens(out).join(' ');
   }
-  return normalize(out);
 }
 
 /** True when the record is the requested song: same title, or same title once trailing version tags are removed. */
 export function titleMatches(wanted: string, found: string | undefined): boolean {
   if (!found) return false;
-  const a = normalize(wanted);
-  if (a !== '' && a === normalize(found)) return true;
+  const a = tokens(wanted).join(' ');
+  if (a !== '' && a === tokens(found).join(' ')) return true;
   const baseA = stripVersion(wanted);
   return baseA !== '' && baseA === stripVersion(found);
 }
