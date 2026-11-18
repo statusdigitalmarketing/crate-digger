@@ -52,7 +52,9 @@ const FEATURING_WORDS = new Set(['feat', 'ft', 'featuring']);
 function primaryArtist(value: string): string {
   // "&" and "and" are the same word in a band name (Simon & Garfunkel = Simon and Garfunkel).
   const words = tokens(value.replace(/&/g, ' and '));
-  const cut = words.findIndex(w => FEATURING_WORDS.has(w));
+  // Split only on a real credit: a lead artist before the word and a featured artist after it,
+  // so band names like "Little Feat" stay whole.
+  const cut = words.findIndex((w, i) => FEATURING_WORDS.has(w) && i > 0 && i < words.length - 1);
   return (cut === -1 ? words : words.slice(0, cut)).join(' ');
 }
 

@@ -113,6 +113,9 @@ describe('lrclib', () => {
     expect(artistMatches('Simon & Garfunkel', 'simon and garfunkel')).toBe(true);
     expect(artistMatches('Simon', 'Simon & Garfunkel')).toBe(false);
     expect(artistMatches('Daft Punk (feat. Romanthony)', 'Daft Punk')).toBe(true);
+    expect(artistMatches('Little Feat', 'Little')).toBe(false);
+    expect(artistMatches('Little Feat', 'Little Feat')).toBe(true);
+    expect(artistMatches('Little Feat feat. Bonnie Raitt', 'Little Feat')).toBe(true);
     expect(artistMatches('Florence and the Machine', 'Florence and the Machine')).toBe(true);
   });
 
