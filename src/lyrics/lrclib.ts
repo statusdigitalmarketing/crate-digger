@@ -32,11 +32,16 @@ function normalize(value: string): string {
 }
 
 // Matching work is bounded: inputs come from MCP tool arguments and LRCLIB responses of any length.
+// Longer names are rejected (a miss), never truncated, since a truncated name can equal a different one.
 const MAX_NAME_LENGTH = 200;
+
+function tooLong(...values: string[]): boolean {
+  return values.some(v => v.length > MAX_NAME_LENGTH);
+}
 
 /** Lowercased word tokens. The only regexes used are single-class and linear, so no backtracking blowup. */
 function tokens(value: string): string[] {
-  const n = normalize(value.slice(0, MAX_NAME_LENGTH));
+  const n = normalize(value);
   return n ? n.split(' ') : [];
 }
 
@@ -46,7 +51,7 @@ const FEATURING_WORDS = new Set(['feat', 'ft', 'featuring']);
 
 function primaryArtist(value: string): string {
   // "&" and "and" are the same word in a band name (Simon & Garfunkel = Simon and Garfunkel).
-  const words = tokens(value.slice(0, MAX_NAME_LENGTH).replace(/&/g, ' and '));
+  const words = tokens(value.replace(/&/g, ' and '));
   const cut = words.findIndex(w => FEATURING_WORDS.has(w));
   return (cut === -1 ? words : words.slice(0, cut)).join(' ');
 }
@@ -57,7 +62,7 @@ function primaryArtist(value: string): string {
  * matches "Earth, Wind & Fire". A miss only means no lyrics; a false match means the wrong song.
  */
 export function artistMatches(wanted: string, found: string | undefined): boolean {
-  if (!found) return false;
+  if (!found || tooLong(wanted, found)) return false;
   const a = primaryArtist(wanted);
   return a !== '' && a === primaryArtist(found);
 }
@@ -75,7 +80,7 @@ function isVersionTag(text: string): boolean {
 }
 
 function stripVersion(value: string): string {
-  let out = value.slice(0, MAX_NAME_LENGTH).trim();
+  let out = value.trim();
   // Each pass removes one tag or stops, and the string only shrinks, so this ends quickly.
   for (;;) {
     const last = out.charAt(out.length - 1);
@@ -97,7 +102,7 @@ function stripVersion(value: string): string {
 
 /** True when the record is the requested song: same title, or same title once trailing version tags are removed. */
 export function titleMatches(wanted: string, found: string | undefined): boolean {
-  if (!found) return false;
+  if (!found || tooLong(wanted, found)) return false;
   const a = tokens(wanted).join(' ');
   if (a !== '' && a === tokens(found).join(' ')) return true;
   const baseA = stripVersion(wanted);

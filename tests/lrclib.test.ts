@@ -136,7 +136,8 @@ describe('lrclib', () => {
   it('stays fast on huge or pathological names', () => {
     const t0 = Date.now();
     expect(artistMatches('A' + ' '.repeat(100000) + 'Z', 'A Z')).toBe(false);
-    expect(titleMatches('x' + ' ('.repeat(50000), 'x')).toBe(true);
+    expect(titleMatches('x' + ' ('.repeat(50000), 'x')).toBe(false);
+    expect(artistMatches('Air' + ' '.repeat(197) + 'Supply', 'Air')).toBe(false);
     expect(titleMatches('(' .repeat(50000) + ')', 'x')).toBe(false);
     expect(Date.now() - t0).toBeLessThan(200);
   });
