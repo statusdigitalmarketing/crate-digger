@@ -1,3 +1,5 @@
+export type LyricsSource = 'lrclib' | 'genius' | 'musixmatch' | 'llm' | 'none';
+
 export type Mood = 'happy' | 'sad' | 'angry' | 'chill' | 'dark' | 'hype' | 'romantic' | 'anxious';
 
 export interface TrackClassification {
@@ -10,14 +12,14 @@ export interface TrackClassification {
   mood_arc?: MoodArc;
   source: {
     lyrics_found: boolean;
-    lyrics_source: 'genius' | 'musixmatch' | 'llm' | 'none';
+    lyrics_source: LyricsSource;
     audio_analyzed: boolean;
   };
 }
 
 export interface LyricsResult {
   lyrics: string | null;
-  source: 'genius' | 'musixmatch' | 'llm' | 'none';
+  source: LyricsSource;
   themes: string[];
   mood_hint: string | null;
 }

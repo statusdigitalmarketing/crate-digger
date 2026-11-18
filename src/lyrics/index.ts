@@ -1,5 +1,6 @@
 import type { LyricsResult } from '../types.js';
 import { LyricsCache } from './cache.js';
+import { fetchFromLrclib } from './lrclib.js';
 import { fetchFromGenius } from './genius.js';
 import { fetchFromMusixmatch } from './musixmatch.js';
 import { llmFallback } from './llm-fallback.js';
@@ -10,6 +11,13 @@ export async function fetchLyrics(artist: string, title: string): Promise<Lyrics
   // Check cache first
   const cached = cache.get(artist, title);
   if (cached) return cached;
+
+  // Try LRCLIB first: free, no key, full lyrics
+  const lrclibResult = await fetchFromLrclib(artist, title);
+  if (lrclibResult) {
+    cache.set(artist, title, lrclibResult);
+    return lrclibResult;
+  }
 
   // Try Genius
   const geniusResult = await fetchFromGenius(artist, title);

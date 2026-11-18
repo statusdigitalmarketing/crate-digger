@@ -1,9 +1,9 @@
-import type { Mood, TrackClassification, LyricsAnalysis, SpotifyFeatures } from '../types.js';
+import type { Mood, TrackClassification, LyricsAnalysis, SpotifyFeatures, LyricsSource } from '../types.js';
 
 export interface MoodSignals {
   lyricsAnalysis: LyricsAnalysis | null;
   spectralMood: string | null;
-  lyricsSource: 'genius' | 'musixmatch' | 'llm' | 'none';
+  lyricsSource: LyricsSource;
   lyricsFound: boolean;
   audioAnalyzed: boolean;
   spotifyFeatures?: SpotifyFeatures | null;
