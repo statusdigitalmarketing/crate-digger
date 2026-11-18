@@ -54,7 +54,9 @@ function primaryArtist(value: string): string {
   const words = tokens(value.replace(/&/g, ' and '));
   // Split only on a real credit: a lead artist before the word and a featured artist after it,
   // so band names like "Little Feat" stay whole.
-  const cut = words.findIndex((w, i) => FEATURING_WORDS.has(w) && i > 0 && i < words.length - 1);
+  // "Little Feat feat. Bonnie Raitt": the first "feat" is part of the band name, the second is the credit.
+  const cut = words.findIndex((w, i) =>
+    FEATURING_WORDS.has(w) && i > 0 && i < words.length - 1 && !FEATURING_WORDS.has(words[i + 1]));
   return (cut === -1 ? words : words.slice(0, cut)).join(' ');
 }
 

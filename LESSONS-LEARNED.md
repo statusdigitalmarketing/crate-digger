@@ -24,3 +24,9 @@
 - **FIX**: 2.1.0 tries LRCLIB first (https://lrclib.net, free, no key, full lyrics). Before telling users to sign up for anything, open the actual signup page.
 - **CONTEXT**: The release had no working free lyrics path, which surfaced only when we tried to create keys for a user.
 - **DETECTION**: Live check with no keys set: classify a known song and confirm `source.lyrics_found` is true.
+
+### Process - 2026-11-18
+- **MISTAKE**: Ran `npm test ...; git commit ...; git push` joined with `;`, so a failing test still got committed, pushed and sent to Codex review (LRCLIB 'Little Feat feat. Bonnie Raitt' case).
+- **FIX**: Chain verification and shipping with `&&` (`npm run check && npm test && git commit ... && git push`) so a failure stops the push.
+- **CONTEXT**: Every push here triggers a paid Codex review and CI.
+- **DETECTION**: Before any push command, check that it is joined to the test run with `&&`.
