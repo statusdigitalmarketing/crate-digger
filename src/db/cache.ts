@@ -152,10 +152,19 @@ export function cacheLyrics(artist: string, title: string, result: LyricsResult)
   }
 }
 
+// mood_arc is optional: a malformed value drops only the arc, never the row or a whole search result.
+function parseMoodArc(value: unknown): TrackClassification['mood_arc'] {
+  if (typeof value !== 'string') return undefined;
+  try {
+    return JSON.parse(value) as TrackClassification['mood_arc'];
+  } catch (err: unknown) {
+    process.stderr.write(`Ignoring malformed cached mood_arc: ${err instanceof Error ? err.message : String(err)}\n`);
+    return undefined;
+  }
+}
+
 function rowToClassification(row: Record<string, unknown>): TrackClassification {
-  const moodArc = typeof row['mood_arc'] === 'string'
-    ? JSON.parse(row['mood_arc']) as TrackClassification['mood_arc']
-    : undefined;
+  const moodArc = parseMoodArc(row['mood_arc']);
   return {
     ...(moodArc ? { mood_arc: moodArc } : {}),
     mood: row['mood'] as TrackClassification['mood'],

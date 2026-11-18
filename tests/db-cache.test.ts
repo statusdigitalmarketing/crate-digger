@@ -85,6 +85,15 @@ describe('database cache', () => {
     expect(result?.classification.mood_arc).toEqual(withArc.mood_arc);
   });
 
+  it('should drop only a malformed mood_arc, not the row or the search', () => {
+    upsertClassification('Bad Arc', 'Track A', { ...sampleClassification, mood: 'anxious' });
+    upsertClassification('Good Arc', 'Track B', { ...sampleClassification, mood: 'anxious' });
+    getDb().prepare("UPDATE classifications SET mood_arc = '{broken' WHERE artist = 'Bad Arc'").run();
+    const hits = searchByMood('anxious');
+    expect(hits.map(h => h.artist).sort()).toEqual(['Bad Arc', 'Good Arc']);
+    expect(getCachedClassification('Bad Arc', 'Track A')?.classification.mood_arc).toBe(undefined);
+  });
+
   it('should upsert (update same artist+title)', () => {
     const updated: TrackClassification = {
       ...sampleClassification,
