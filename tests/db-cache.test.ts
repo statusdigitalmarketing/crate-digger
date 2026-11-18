@@ -71,6 +71,20 @@ describe('database cache', () => {
     expect(result?.classification.energy).toBe(75);
   });
 
+  it('should keep mood_arc on a cached lookup', () => {
+    const withArc: TrackClassification = {
+      ...sampleClassification,
+      mood_arc: {
+        sections: [{ label: 'verse', sentiment: -0.5, mood: 'sad' }, { label: 'chorus', sentiment: 0.8, mood: 'happy' }],
+        arc_type: 'contrast',
+        variance: 0.65,
+      },
+    };
+    upsertClassification('Arc Artist', 'Arc Song', withArc);
+    const result = getCachedClassification('Arc Artist', 'Arc Song');
+    expect(result?.classification.mood_arc).toEqual(withArc.mood_arc);
+  });
+
   it('should upsert (update same artist+title)', () => {
     const updated: TrackClassification = {
       ...sampleClassification,

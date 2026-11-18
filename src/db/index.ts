@@ -84,6 +84,12 @@ function initSchema(database: BetterSqlite3Database): void {
       UNIQUE(artist, title)
     );
   `);
+
+  // Added after v2.0.0: databases created earlier lack this column.
+  const columns = database.prepare('PRAGMA table_info(classifications)').all();
+  if (!columns.some(c => c['name'] === 'mood_arc')) {
+    database.exec('ALTER TABLE classifications ADD COLUMN mood_arc TEXT');
+  }
 }
 
 export function closeDb(): void {

@@ -36,8 +36,8 @@ export function upsertClassification(
       INSERT INTO classifications (
         artist, title, mood, energy, subgenre_vibe, lyric_themes,
         spectral_mood, confidence, lyrics_found, lyrics_source,
-        audio_analyzed, spotify_valence, spotify_energy, spotify_danceability
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        audio_analyzed, spotify_valence, spotify_energy, spotify_danceability, mood_arc
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(artist, title) DO UPDATE SET
         mood = excluded.mood,
         energy = excluded.energy,
@@ -51,6 +51,7 @@ export function upsertClassification(
         spotify_valence = excluded.spotify_valence,
         spotify_energy = excluded.spotify_energy,
         spotify_danceability = excluded.spotify_danceability,
+        mood_arc = excluded.mood_arc,
         updated_at = unixepoch()
     `).run(
       artist,
@@ -67,6 +68,7 @@ export function upsertClassification(
       spotifyFeatures?.valence ?? null,
       spotifyFeatures?.energy ?? null,
       spotifyFeatures?.danceability ?? null,
+      classification.mood_arc ? JSON.stringify(classification.mood_arc) : null,
     );
   } catch (err: unknown) {
     process.stderr.write(`DB upsert error: ${err instanceof Error ? err.message : String(err)}\n`);
@@ -151,7 +153,11 @@ export function cacheLyrics(artist: string, title: string, result: LyricsResult)
 }
 
 function rowToClassification(row: Record<string, unknown>): TrackClassification {
+  const moodArc = typeof row['mood_arc'] === 'string'
+    ? JSON.parse(row['mood_arc']) as TrackClassification['mood_arc']
+    : undefined;
   return {
+    ...(moodArc ? { mood_arc: moodArc } : {}),
     mood: row['mood'] as TrackClassification['mood'],
     energy: row['energy'] as number,
     subgenre_vibe: row['subgenre_vibe'] as string,
