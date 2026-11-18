@@ -36,8 +36,10 @@ export function getDb(): BetterSqlite3Database {
   if (db) return db;
 
   try {
-    const Database = require('better-sqlite3') as new (path: string) => BetterSqlite3Database;
-    db = new Database(getDbPath());
+    // node:sqlite is built into Node 22.13+ / 23.4+, so the download has no native
+    // module to compile (better-sqlite3 had no prebuilt binary for newer Node).
+    const { DatabaseSync } = require('node:sqlite') as { DatabaseSync: new (path: string) => BetterSqlite3Database };
+    db = new DatabaseSync(getDbPath());
     initSchema(db);
     return db;
   } catch (err: unknown) {
